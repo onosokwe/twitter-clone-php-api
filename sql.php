@@ -1,118 +1,163 @@
 <?php
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: PUT, GET, POST, DELETE");
-header("Access-Control-Allow-Headers: Origin, X-Requested-With, Content-Type, Accept");
-define('HOST','localhost');
+// HOST is the hostname which is localhost,
+// USER is the user name which is root,
+// PASSWORD is the password of the user which is empty by default,
+// DATABASE is the database which we need to connect to.
+define('HOST', 'localhost');
 define('USER', 'root');
-define('PASS', '');
-define('DB','dev_chat');
-class connectr {
-	private static $_conn;	
-	public function iConnect($db='',$create = false){
-	if(empty($db)){
-		if ($create){$_conn = (empty($_conn)) ? new MySQLi(HOST,USER,PASS) : $_conn;}
-		else {$_conn = (empty($_conn)) ? new MySQLi(HOST,USER,PASS,DB) : $_conn;}
-	} else {$_conn = ($db === 'X') ? new MySQLi(HOST,USER,PASS) : new MySQLi(HOST,USER,PASS,$db);}
-		return $_conn;
+define('PASSWORD', '');
+define('DATABASE', '');
+
+// This class is only used to establish a connection to our database
+// We created to return a private and static variable so that 
+// connection to our database can only be established from a class that extends this class
+// This is some form of security for our application
+class appStart {
+	// declare a private static variable that will only be
+	// accessible in the class that extends it, which is eCommerceApp
+	// which we have created below
+	private static $connect;
+	public function connect($db){
+		if(!empty($db)){
+			$connect = new MySQLi(HOST,USER,PASSWORD,$db);
+		} else {
+			$connect = new MySQLi(HOST,USER,PASSWORD,DATABASE);
+		}
+		return $connect;
 	}
 }
-class socialApp extends connectr {
-	public $conn;	public $sql;	public $result;	
+
+class sqlOps extends appStart {
+	// Declare the public variables for basic sql operations we will use later on
+	// We will use these variables later on in creating our queries/methods
+
+	public $conn; // this holds the connection string returned from instantiating the appStart class using the constructor method
+	public $sql; // this holds the sql query that will be sent from our function file
+	public $result; // this holds the result of the query that the methods will run, which will be received by the function. We will explain this further later
+
+	// the constructor is called first when the class is instantiated
+	// hence we use it to establish our database connection
+	// with that database connection we can now start making our queries
+
 	public function __construct($db=''){
-    $this->conn = $this->iConnect($db);
+    	$this->conn = $this->connect($db);
 		$this->result = NULL;
 	}
-	public function strEscape($string){ 
-		$string = strip_tags(htmlentities(htmlspecialchars(stripslashes(trim($string)))));
-		$escString = $this->conn->real_escape_string($string);
-		return $escString; 
-	}
-	public  function clean($data_Array){ 
-		if(!is_array($data_Array)){ die("Function 'clean()' expects an Array as parameter"); }
-		$esValues = array_map(array($this,'strEscape'),$data_Array);
-		return $esValues;
-	} 
-	private function squeries($sql){ 
+
+	// below here we will make methods that will perform
+	// all the queries that we need which are basically 
+	// the CRUD operations (Create, Read, Update, Delete)
+	// and a few other async operations
+	// NOTE that backend is not only CRUD operations, 
+	// but they are the basic operations
+
+	// This is a private method that will be doing all our 
+	// direct queries into the DATABASE for us. 
+	// We have written it as a separate method so that 
+	// we can control it
+	// Also we made made it a private method to limit 
+	// its use to only this class where it is created
+	// This restricts database access to only the app layer.
+	private function myquery($sql){ 
+		// this is SQL statement we want to perform via the query
 		$this->sql = $sql; 
-		$this->result = $this->conn->query($this->sql);  
+		// this is where we are doing the operation via MySQL query
+		// function. we assigned the result of the operation to
+		// variable result predefined in line 36 
+		$this->result = $this->conn->query($this->sql);
+		// if the result is TRUE (that is no error), 
+		// return the result  
 		if($this->result){   
 			return $this->result;
-		}else{ die($this->conn->error."; Problem with Query \"".$this->sql."\"\n"); }
+		} 
+		// else die the operation and return the error.
+		else { 
+			die ($this->conn->error."; 
+				Problem with Query \"".$this->sql."\"\n"); 
+		}
 	}
-	public function insert($table, $cols, $vals){
+
+	//////////////////////////////////////////////
+	/////// C R U D   O P E R A T I O N S ////////
+	//////////////////////////////////////////////
+
+	// This is the CREATE operation. It inserts data into
+	// the database using the myquery method created above. 
+	// We are receiving the column names and values as an array.
+	// Therefore they must match. You cannot have three columns 
+	// specified and two data values to be inserted, else this 
+	// method will throw an error.
+	public function insert($table, $cols, $values){
+		// the cols is received as an array and we use the 
+		// implode function to  
 		$cols = (is_array($cols)) ? implode(',',$cols) : $cols;
-		$vals = (is_array($vals)) ? implode(',',$vals) : $vals;
-		if(substr($vals,0,1) == '('){
-			$sqlin = $this->squeries("INSERT INTO {$table} ({$cols}) VALUES {$vals}");
-		}else{
-			$sqlin = $this->squeries("INSERT INTO {$table} ({$cols}) VALUES ({$vals})");
+		$values = (is_array($values)) ? implode(',',$values) : $values;
+		if(substr($values,0,1) == '('){
+			$sql = $this->myquery("INSERT INTO {$table} ({$cols}) VALUES {$values}");
+		} else {
+			$sql = $this->myquery("INSERT INTO {$table} ({$cols}) VALUES ({$values})");
 		}
-		if($sqlin){ return $this->conn->affected_rows; }else{ return FALSE; }
+		if($sql){ return $this->conn->affected_rows; } else { return FALSE; }
 	}
-	public function insert_check($table, $cols, $vals,$where=''){
-		if(empty($where)){ die("Please, define a 'WHERE ..' clause for this operation"); }
-		$slct = $this->select($table, $cols, $where);
-		if(!$this->result->num_rows){
-			return $this->insert($table, $cols, $vals);
-		}else{return 0;} 
-	}
-	public function select($table,$cols='',$where='',$orderBy='',$limit='',$joinTbl='',$on=''){
-		list($tableA,$tableB) = (is_array($table)) 	 ? $table 	: array($table,'');
-		list($colsA,$colsB)	  = (is_array($cols))	 	 ? $cols 		: array($cols,'');
-		list($whrA,$whrB)	 	  = (is_array($where)) 	 ? $where 	: array($where,'');
-		list($orderA,$orderB) = (is_array($orderBy)) ? $orderBy : array($orderBy,'');
-		list($limitA,$limitB)	= (is_array($limit)) 	 ? $limit 	: array($limit,'');
-		list($joinA,$joinB)		= (is_array($joinTbl)) ? $joinTbl : array($joinTbl,'');
-		list($onA,$onB)				= (is_array($on)) 	 	 ? $on 			: array($on,''); 
- 		if(empty($colsA)){ $colsA = '*'; }else{	$colsA = (is_array($colsA)) ? implode(',',$colsA) : $colsA;	} 
-		if(empty($colsB)){ $colsB = '*'; }else{	$colsB = (is_array($colsB)) ? implode(',',$colsB) : $colsB;	} 
-		if(is_array($whrA)){ 
-			list($mark,$col) = $whrA;
-			if($mark == 'wS'){  // WHERE (SELECT...
-				$whrA = "WHERE {$col} = (SELECT {$colsB} FROM {$tableB} {$joinB} {$onB} {$whrB} {$orderB} {$limitB})";
-				$slct	= "SELECT {$colsA} FROM {$tableA} {$joinA} {$onA} {$whrA} {$orderA} {$limitA}";
-			}elseif($mark == 'sI'){ // SELECT INTO...
-				$slct	 = "SELECT {$colsA} FROM {$tableA} {$joinA} {$onA} {$whrA} {$orderA} {$limitA}";
-				$slct	.= "INTO {$tableB} {$colsB}";
-			}
-		}elseif(!empty($tableB)){ // UNION SELECT
-			$slct	 = "SELECT {$colsA} FROM {$tableA} {$joinA} {$onA} {$whrA} {$orderA} {$limitA}";
-			$slct .= " UNION SELECT {$colsB} FROM {$tableB} {$joinB} {$onB} {$whrB} {$orderB} {$limitB}";
-		}else{ 
-			$slct	 = "SELECT {$colsA} FROM {$tableA} {$joinA} {$onA} {$whrA} {$orderA} {$limitA}";
-		}
-		if($this->squeries($slct)){ 
+
+	// This is the READ operation. We will use it to read in other
+	// words select data from the database.
+	// We have added some optional parameters for the method by
+	// assigning them to an empty string.
+	// This method returns the number of items that meets the 
+	// condition of the parameters as shown on line 96.
+	// If you want to select and fetch the data use the next
+	// method which is select_fetch 
+	public function select($table, $cols='', $where='', $orderBy='', $limit=''){
+		$sel = "SELECT {$cols} FROM {$table} {$where} {$orderBy} {$limit}";
+		if($this->myquery($sel)){ 
 			return $this->result->num_rows; 
-		}
-		return FALSE; 
+		} return FALSE;
 	}
-	public function select_f($table,$cols='',$where='',$orderBy='',$limit=''){
-		$list = $this->select($table,$cols,$where,$orderBy,$limit);
-        return ($list) ? $this->result : false;
-	}
-	public function select_fetch($table,$cols='',$where='',$orderBy='',$limit='',$joinTbl='',$on=''){
-		if($slct = $this->select($table,$cols,$where,$orderBy,$limit,$joinTbl,$on)){
-			$fetch = array(); $sn = 0;
-			while($row = $this->result->fetch_assoc()){
-				// $row['usn'] = ++$sn; 
+
+	// This is also a READ operation. It is used to select and fetch
+	// the data from the database. The data is displayed as an array
+	// which could be converted to JSON at the front end	
+	public function select_fetch($table, $cols='', $where='', $orderBy='', $limit=''){
+		if($sel = $this->select($table,$cols,$where,$orderBy,$limit)){
+			$fetch = array(); 
+			$sn = 0;
+			while($row = $this->result->fetch_assoc()){	
 				$fetch[] = $row;
 			} return $fetch;
-		}else{ return ($slct === 0) ? $slct : FALSE; }
+		} else { return ($sel === 0) ? $sel : FALSE; }
 	}
-	public function update($table,$colsVals,$where,$joinTbl='',$on=''){
-		if(empty($where)){ die("Please, define a [or an Array of two] ' WHERE..' clause(s) for this operation"); }
-		if(empty($colsVals)){ die("Please, specify COLUMN=['VALUE'] set for this operation"); }
-		if(is_array($where)){
-			list($where,$whrUNIQUE) = $where; if($this->select($table,'',$whrUNIQUE)){ return FALSE; }}
+
+	// This is the UPDATE operation. It is used to update data in
+	// the database. It receives as a parameter a variable that is 
+	// an array of column and value pairs for example. 
+	// $colsVals = "`name`='James Cameron',`email`='james@cameron.com'"
+	public function update($table, $colsVals, $where){
+		if(empty($where)){ die("Please, define a WHERE"); }
+		if(empty($colsVals)){ die("Please, specify COLUMN=['VALUE']"); }
+		if(is_array($where)){ 
+			list($where,$whrUNIQUE) = $where; 
+			if($this->select($table,'',$whrUNIQUE)){ return FALSE; }
+		}
 		$colsVals = (is_array($colsVals)) ? implode(',',$colsVals) : $colsVals; 
-		$sqlup	= $this->squeries("UPDATE {$table} {$joinTbl} {$on} SET {$colsVals} {$where}"); 
-		if($sqlup){ return $this->conn->affected_rows; }else{ return FALSE; } 
+		$sql = $this->myquery("UPDATE {$table} SET {$colsVals} {$where}"); 
+		if($sql){ return $this->conn->affected_rows; } else { return FALSE; } 
 	}
+	
+	// This is also a READ operation. It is used to select and fetch
+	// the all instances of the user liking the particluar tweet 
     public function getTweetLikes($tweetid){
-        $table = 'tweets'; $where = "`tweetid` = '$tweetid'"; $limit = '1';
-        $sql = $this->squeries("SELECT likes FROM {$table} WHERE {$where} LIMIT {$limit}");
-        $rowcount = mysqli_fetch_assoc($sql);
-        if (!is_null($rowcount)) {$last = end($rowcount); return $last;} else {return false;}
+		$table = 'tweets'; 
+		$where = "`tweetid` = '$tweetid'"; 
+		$limit = '1';
+		$sql = $this->myquery("SELECT likes FROM {$table} WHERE {$where} LIMIT {$limit}");
+		$rowcount = mysqli_fetch_assoc($sql);
+		if (!is_null($rowcount)) {
+			$last = end($rowcount); 
+			return $last;
+		} else {
+			return false;
+		}
     }
 }
 ?>
