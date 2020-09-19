@@ -10,10 +10,10 @@ header('Access-Control-Allow-Headers: X-Requested-With, content-type, access-con
 // Indicates the media type of the resource.
 header("Content-Type: application/json; charset=UTF-8");
 // Import the function and validator files
-require_once __DIR__ . '/fxn.php';
+require_once __DIR__ . '/app.php';
 require_once __DIR__ . '/val.php';
-// Make an instance of the function class to create the $fxn object
-$fxn = new fxn(); 
+// Make an instance of the socialApp class to create the $fxn object
+$fxn = new socialApp(); 
 // Make an instance of the VALIDATE class to create the $val object for validation
 $val = new VALIDATE();
 // Receive requests 
