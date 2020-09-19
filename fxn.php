@@ -1,10 +1,11 @@
 <?php
 include_once('sql.php');
 date_default_timezone_set ("Africa/Lagos");
-class fxn extends socialApp {
+class socialApp extends sqlOps {
 	public $conn;
 	public function __construct(){
-		$this->conn = new socialApp(DB); return $this->conn;
+		$this->conn = new sqlOps(); 
+		return $this->conn;
 	}
 	// USER
 	public function isUserRegistered($email, $phone){
@@ -102,7 +103,5 @@ class fxn extends socialApp {
 			} else {return false;} 
 		}
 	}
-
-
 }
 ?>
