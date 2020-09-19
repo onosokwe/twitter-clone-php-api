@@ -3,7 +3,13 @@ I built a Social Media Web Application that mimicks the features of Twitter {sig
 
 ## Project setup
 ```
-Clone the repo and get started. Call the endpoint at /api.php. Pass in the key that corresponds to your request alongside with the other params for the request. DB was excluded for confidentiality.
+Clone the repo and get started. 
+
+Call the endpoint at /api.php. 
+
+Pass in the key that corresponds to your request alongside with the other params for the request. 
+
+DB was excluded for confidentiality.
 ```
 
 ### Deployment
