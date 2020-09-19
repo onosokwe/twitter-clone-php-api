@@ -1,4 +1,4 @@
-# twitter-clone-with-react
+# twitter-clone-php-api
 I built a Social Media Web Application that mimicks the features of Twitter {signup, login, forgot password, tweet, like tweet, follow, unfollow, etc}
 
 ## Project setup
